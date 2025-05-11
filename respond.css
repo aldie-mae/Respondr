@@ -1,0 +1,32 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #0e1a33;
+    color: white;
+  }
+  
+  header {
+    padding: 15px;
+    background-color: #001f3f;
+    text-align: center;
+  }
+  
+  #map {
+    height: 400px;
+    width: 100%;
+    margin-top: 10px;
+  }
+  
+  .ai-container {
+    background: #162a4a;
+    padding: 20px;
+    margin: 20px;
+    border-radius: 10px;
+  }
+  
+  #ai-response {
+    margin-top: 10px;
+    font-size: 1rem;
+    white-space: pre-wrap;
+  }
+  

@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script type="module" src="supabase.js"></script>
+  <script type="module" src="admin.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Respondr Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    .notifications-panel { position: fixed; top: 70px; right: 20px; width: 350px; background: white; box-shadow: 0 5px 20px rgba(0,0,0,0.15); border-radius: 12px; z-index: 1000; display: none; overflow: hidden; }
+    .notifications-list { max-height: 400px; overflow-y: auto; }
+    .notification-item { padding: 1rem; border-bottom: 1px solid rgba(0,0,0,0.05); display: flex; align-items: center; }
+    .notification-icon { width: 36px; height: 36px; border-radius: 50%; background: rgba(58, 134, 255, 0.1); color: var(--accent); display: flex; align-items: center; justify-content: center; margin-right: 1rem; }
+    .notification-content { flex: 1; }
+    .notification-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem; }
+    .notification-message { font-size: 0.8rem; color: var(--gray); }
+    .notification-time { font-size: 0.75rem; color: var(--gray); margin-top: 0.25rem; }
+    .status-active { background: rgba(46, 204, 113, 0.15); color: #27ae60; }
+    .status-pending { background: rgba(241, 196, 15, 0.15); color: #f39c12; }
+    .status-expired { background: rgba(189, 195, 199, 0.15); color: #7f8c8d; }
+    .status-critical { background: rgba(231, 76, 60, 0.15); color: #c0392b; }
+    .fire-icon { background: #e74c3c; color: white; }
+    .medical-icon { background: #3498db; color: white; }
+    .police-icon { background: #2c3e50; color: white; }
+    .emergency-panel, .responder-panel { position: fixed; top: 0; right: 0; width: 500px; height: 100vh; background: white; box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1); z-index: 1001; display: none; flex-direction: column; }
+    .panel-header { padding: 1rem; background: var(--secondary); color: white; display: flex; justify-content: space-between; align-items: center; }
+    .panel-header h3 { margin: 0; font-size: 1.2rem; }
+    .close-panel { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; padding: 0 0.5rem; }
+    .panel-content { flex: 1; overflow-y: auto; padding: 1rem; }
+    .emergencies-list { display: flex; flex-direction: column; gap: 1rem; }
+    .emergency-item { background: #f9f9f9; border-radius: 8px; padding: 1rem; border: 1px solid #eee; }
+    .emergency-item h4 { margin: 0 0 0.5rem 0; color: var(--secondary); }
+    .emergency-item p { margin: 0.25rem 0; font-size: 0.9rem; }
+    .emergency-item .time { color: var(--gray); font-size: 0.8rem; margin-top: 0.5rem; }
+    .emergency-item .respond-btn { margin-top: 0.5rem; padding: 0.5rem 1rem; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; }
+    .responder-controls { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .responder-controls button { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; }
+    .responder-controls .select-all { background: var(--accent); color: white; }
+    .responder-controls .notify-all { background: var(--success); color: white; }
+    .responder-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: #f9f9f9; border-radius: 8px; margin-bottom: 0.5rem; border: 1px solid #eee; }
+    .responder-info { display: flex; align-items: center; flex: 1; }
+    .checkbox-container { display: block; position: relative; padding-left: 30px; margin-right: 1rem; cursor: pointer; user-select: none; }
+    .checkbox-container input { position: absolute; opacity: 0; cursor: pointer; height: 0; width: 0; }
+    .checkmark { position: absolute; top: 0; left: 0; height: 20px; width: 20px; background-color: #eee; border-radius: 4px; }
+    .checkbox-container:hover input ~ .checkmark { background-color: #ccc; }
+    .checkbox-container input:checked ~ .checkmark { background-color: var(--primary); }
+    .checkmark:after { content: ""; position: absolute; display: none; }
+    .checkbox-container input:checked ~ .checkmark:after { display: block; }
+    .checkbox-container .checkmark:after { left: 7px; top: 3px; width: 5px; height: 10px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+    .responder-item .details { flex: 1; }
+    .responder-item h4 { margin: 0 0 0.25rem 0; }
+    .responder-item p { margin: 0.1rem 0; font-size: 0.85rem; }
+    .responder-item .notify-btn { padding: 0.5rem 1rem; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 1rem; }
+    .panel-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 1000; display: none; }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Arial', sans-serif; }
+    :root { --primary: #e74c3c; --primary-dark: #c0392b; --secondary: #1b263b; --secondary-light: #2c3e50; --accent: #3498db; --success: #2ecc71; --warning: #f39c12; --danger: #e74c3c; --light: #ecf0f1; --dark: #2c3e50; --gray: #95a5a6; }
+    body { background-color: #f5f5f5; color: var(--dark); min-height: 100vh; display: flex; flex-direction: column; }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f1f1; }
+    ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--primary-dark); }
+    header { background: var(--primary); padding: 0.8rem 2rem; display: flex; align-items: center; justify-content: space-between; position: fixed; width: 100%; top: 0; left: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); }
+    .logo-container { display: flex; align-items: center; }
+    .logo { width: 40px; height: auto; margin-right: 10px; }
+    header h1 { color: white; font-size: 24px; font-weight: 700; letter-spacing: 0.5px; }
+    nav ul { display: flex; list-style: none; margin: 0; padding: 0; }
+    nav ul li { margin: 0; position: relative; }
+    nav ul li a { text-decoration: none; color: white; font-size: 16px; font-weight: 500; padding: 1rem 1.25rem; display: flex; align-items: center; transition: 0.3s; border-radius: 4px; }
+    nav ul li a:hover, nav ul li a.active { background: rgba(0, 0, 0, 0.1); }
+    .badge { background-color: white; color: var(--primary); padding: 0.2rem 0.5rem; border-radius: 50%; font-size: 0.7rem; font-weight: bold; margin-left: 0.5rem; min-width: 1.5rem;  text-align: center; display: inline-flex; align-items: center; justify-content: center; }
+    .container { display: flex; flex: 1; margin-top: 70px; }
+    .sidebar { width: 240px; background: var(--secondary); color: white; padding: 1.5rem 0; height: calc(100vh - 70px); position: fixed; left: 0; overflow-y: auto; transition: all 0.3s; box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1); }
+    .sidebar-header { padding: 0 1.5rem 1.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+    .sidebar-header h2 { font-size: 1.2rem; margin-bottom: 0.5rem; color: var(--light); }
+    .sidebar-header p { font-size: 0.8rem; color: rgba(255, 255, 255, 0.6); }
+    .sidebar-menu { list-style: none; padding: 1.5rem 0; }
+    .sidebar-menu li { margin-bottom: 0.25rem; }
+    .sidebar-menu li a { display: flex; align-items: center; padding: 0.75rem 1.5rem; color: rgba(255, 255, 255, 0.8); text-decoration: none; transition: all 0.3s; }
+    .sidebar-menu li a:hover, .sidebar-menu li a.active { background: var(--secondary-light); color: white; }
+    .sidebar-menu li a i { width: 1.5rem; margin-right: 0.75rem; text-align: center; }
+    .sidebar-footer { padding: 1rem 1.5rem; border-top: 1px solid rgba(255, 255, 255, 0.1); font-size: 0.8rem; color: rgba(255, 255, 255, 0.5); }
+    .main-content { flex: 1; padding: 1.5rem; margin-left: 240px; transition: all 0.3s; }
+    .welcome-section { padding: 2rem; background-color: var(--secondary); border-radius: 10px; margin-bottom: 2rem; color: white; position: relative; overflow: hidden; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); }
+    .welcome-content { max-width: 60%; z-index: 1; position: relative; }
+    .welcome-content h1 { font-size: 2.5rem; margin-bottom: 1rem; }
+    .welcome-content h1 span { color: var(--primary); }
+    .welcome-content p { margin-bottom: 1.5rem; line-height: 1.5; }
+    .report-btn { padding: 0.75rem 1.5rem; background: var(--primary); border: none; color: white; font-size: 1rem; font-weight: 600; cursor: pointer; border-radius: 4px; transition: all 0.3s; display: inline-flex; align-items: center; }
+    .report-btn i { margin-right: 0.5rem; }
+    .report-btn:hover { background: var(--primary-dark); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(231, 76, 60, 0.3); }
+    .ambulance-img { position: absolute; right: -200px; bottom: -40px; width: 550px; height: auto; z-index: 0; animation: driveIn 1.5s ease-out forwards; }
+    @keyframes driveIn { 0% { right: -500px; opacity: 0; } 50% { opacity: 1; } 100% { right: -200px; opacity: 1; } }
+    .dashboard-row { display: flex; flex-wrap: wrap; margin: 0 -1rem; }
+    .dashboard-card { flex: 1 1 250px; background: white; border-radius: 10px; margin: 0 1rem 2rem; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); overflow: hidden; transition: all 0.3s; }
+    .dashboard-card:hover { box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1); transform: translateY(-5px); }
+    .card-header { background: var(--secondary); color: white; padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; }
+    .card-header h3 { font-size: 1.1rem; font-weight: 600; }
+    .card-header .card-icon { width: 32px; height: 32px; background: rgba(255, 255, 255, 0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    .card-body { padding: 1.5rem; }
+    .card-footer { padding: 0.75rem 1.5rem; background: rgba(0, 0, 0, 0.02); border-top: 1px solid rgba(0, 0, 0, 0.05); display: flex; justify-content: space-between; align-items: center; }
+    .card-footer a { color: var(--primary); text-decoration: none; font-size: 0.9rem; font-weight: 500; display: flex; align-items: center; }
+    .card-footer a i { margin-left: 0.5rem; }
+    .card-footer .timestamp { color: var(--gray); font-size: 0.8rem; }
+    .stats-card { text-align: center; padding: 1.5rem; }
+    .stats-card .stat-number { font-size: 2.5rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--secondary); }
+    .stats-card .stat-label { font-size: 0.9rem; color: var(--gray); text-transform: uppercase; letter-spacing: 1px; }
+    .stats-card.primary .stat-number { color: var(--primary); }
+    .stats-card.accent .stat-number { color: var(--accent); }
+    .stats-card.success .stat-number { color: var(--success); }
+    .stats-card.warning .stat-number { color: var(--warning); }
+    .emergency-list { list-style: none; }
+    .emergency-item { display: flex; padding: 1rem 0; border-bottom: 1px solid rgba(0, 0, 0, 0.05); }
+    .emergency-item:last-child { border-bottom: none; }
+    .emergency-status { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 50px; height: 50px; border-radius: 50%; margin-right: 1rem; }
+    .status-critical { background: var(--danger); color: white; }
+    .status-high { background: var(--warning); color: white; }
+    .status-medium { background: var(--accent); color: white; }
+    .status-low { background: var(--success); color: white; }
+    .emergency-details { flex: 1; }
+    .emergency-title { font-weight: 600; margin-bottom: 0.25rem; }
+    .emergency-location { font-size: 0.9rem; color: var(--gray); margin-bottom: 0.25rem; }
+    .emergency-time { font-size: 0.8rem; color: var(--gray); }
+    .emergency-actions { display: flex; align-items: center; }
+    .emergency-actions button { background: none; border: none; color: var(--gray); cursor: pointer; transition: all 0.3s; font-size: 1.2rem; margin-left: 0.5rem; }
+    .emergency-actions button:hover { color: var(--primary); }
+    footer { text-align: center; padding: 1.5rem; background: var(--light); color: var(--dark); margin-top: auto; margin-left: 240px; transition: all 0.3s; border-top: 1px solid rgba(0, 0, 0, 0.05); }
+    .map-container { width: 100%; height: 300px; border-radius: 8px; margin-bottom: 1rem; position: relative; }
+    #map { width: 100%; height: 100%; }
+    .map-overlay { position: absolute; top: 1rem; right: 1rem; background: rgba(255, 255, 255, 0.9); padding: 0.75rem; border-radius: 4px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); }
+    .map-overlay h4 { font-size: 0.9rem; margin-bottom: 0.5rem; }
+    .map-legend { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .legend-item { display: flex; align-items: center; font-size: 0.8rem; }
+    .legend-color { width: 10px; height: 10px; border-radius: 50%; margin-right: 0.25rem; }
+    @media (max-width: 992px) { .sidebar { width: 80px; padding: 1rem 0; } .sidebar-header, .sidebar-footer { display: none; } .sidebar-menu li a { padding: 0.75rem; justify-content: center; } .sidebar-menu li a i { margin-right: 0; } .sidebar-menu li a span { display: none; } .main-content, footer { margin-left: 80px; } .welcome-content { max-width: 80%; } .ambulance-img { width: 400px; } }
+    @media (max-width: 768px) { header { padding: 0.5rem 1rem; } .logo { width: 30px; } header h1 { font-size: 18px; } nav ul li a { padding: 0.5rem 0.75rem; font-size: 14px; } .sidebar { width: 0; padding: 0; z-index: 1001; } .sidebar.open { width: 240px; padding: 1.5rem 0; } .main-content, footer { margin-left: 0; } .menu-toggle { display: block; } .welcome-content { max-width: 100%; } .ambulance-img { display: none; } .dashboard-card { flex: 1 1 100%; } }
+    .menu-toggle { display: none; background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; margin-right: 1rem; }
+    @media (max-width: 768px) { .menu-toggle { display: block; } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .fade-in { animation: fadeIn 0.5s ease-in-out; }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .slide-up { animation: slideUp 0.5s ease-in-out; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo-container">
+      <img src="assets/logohdr.png" alt="Respondr Logo" class="logo" />
+      <h1>Respondr</h1>
+    </div>
+    <button class="menu-toggle" id="menuToggle">
+      <i class="fas fa-bars"></i>
+    </button>
+    <nav>
+      <ul>
+        <li><a href="#" class="active">Home</a></li>
+        <li><a href="#" id="notifications-toggle">Notifications <span class="badge" id="notification-badge">0</span></a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <div class="container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2>Command Center</h2>
+        <p>Emergency Response Dashboard</p>
+      </div>
+      <ul class="sidebar-menu">
+        <li><a href="#" class="active"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
+        <li><a href="#"><i class="fas fa-exclamation-triangle"></i> <span>Active Emergencies</span></a></li>
+        <li><a href="#"><i class="fas fa-plus-circle"></i> <span>Report Emergency</span></a></li>
+        <li><a href="#"><i class="fas fa-ambulance"></i> <span>Resources</span></a></li>
+        <li><a href="#" id="notifications-tab"><i class="fas fa-bell"></i> <span>Notifications</span></a></li>
+        <li><a href="#" id="logout-btn"><i class="fas fa-sign-out-alt"></i> <span>Log Out</span></a></li>
+      </ul>
+      <div class="sidebar-footer">
+        <p>© 2025 Respondr</p>
+        <p>Emergency Response System</p>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <section class="welcome-section fade-in">
+        <div class="welcome-content">
+          <h1>Welcome to <span>Respondr</span></h1>
+          <p>A modern emergency response system to help communities in need.</p>
+          <p>Respondr connects volunteers and emergency responders to provide immediate assistance during critical situations. Our platform offers real-time reporting, fast response coordination, and navigation to emergencies.</p>
+          <button class="report-btn" onclick="window.location.href='report.html'">
+            <i class="fas fa-plus-circle"></i> Report Emergency
+          </button>
+        </div>
+        <img src="assets/ambulance.png" alt="Ambulance" class="ambulance-img"/>
+      </section>
+
+      <div class="dashboard-row slide-up">
+        <div class="dashboard-card">
+          <div class="card-header">
+            <h3>Active Emergencies</h3>
+            <div class="card-icon">
+              <i class="fas fa-exclamation-triangle"></i>
+            </div>
+          </div>
+          <div class="card-body stats-card primary">
+            <div class="stat-number">0</div>
+            <div class="stat-label">Current Active</div>
+          </div>
+          <div class="card-footer">
+            <a href="#">View All <i class="fas fa-arrow-right"></i></a>
+            <span class="timestamp">Updated just now</span>
+          </div>
+        </div>
+
+        <div class="dashboard-card">
+          <div class="card-header">
+            <h3>Available Responders</h3>
+            <div class="card-icon">
+              <i class="fas fa-user-md"></i>
+            </div>
+          </div>
+          <div class="card-body stats-card accent">
+            <div class="stat-number">0</div>
+            <div class="stat-label">Ready to Respond</div>
+          </div>
+          <div class="card-footer">
+            <a href="#">View Team <i class="fas fa-arrow-right"></i></a>
+            <span class="timestamp">Updated just now</span>
+          </div>
+        </div>
+
+        <div class="dashboard-card">
+          <div class="card-header">
+            <h3>Resources Deployed</h3>
+            <div class="card-icon">
+              <i class="fas fa-ambulance"></i>
+            </div>
+          </div>
+          <div class="card-body stats-card warning">
+            <div class="stat-number">0</div>
+            <div class="stat-label">Vehicles & Equipment</div>
+          </div>
+          <div class="card-footer">
+            <a href="#">View Resources <i class="fas fa-arrow-right"></i></a>
+            <span class="timestamp">Updated just now</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="dashboard-row slide-up" style="animation-delay: 0.2s;">
+        <div class="dashboard-card" style="flex: 2;">
+          <div class="card-header">
+            <h3>Emergency Map</h3>
+            <div class="card-icon">
+              <i class="fas fa-map-marked-alt"></i>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="map-container">
+              <div id="map"></div>
+              <div class="map-overlay">
+                <h4>Map Legend</h4>
+                <div class="map-legend">
+                  <div class="legend-item">
+                    <div class="legend-color" style="background: var(--danger);"></div>
+                    <span>Critical</span>
+                  </div>
+                  <div class="legend-item">
+                    <div class="legend-color" style="background: var(--warning);"></div>
+                    <span>High</span>
+                  </div>
+                  <div class="legend-item">
+                    <div class="legend-color" style="background: var(--accent);"></div>
+                    <span>Medium</span>
+                  </div>
+                  <div class="legend-item">
+                    <div class="legend-color" style="background: var(--success);"></div>
+                    <span>Low</span>
+                  </div>
+                  <div class="legend-item">
+                    <div class="legend-color" style="background: #0000FF;"></div>
+                    <span>Responder</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card-footer">
+            <a href="#">Full Map View <i class="fas fa-arrow-right"></i></a>
+            <span class="timestamp">Live View</span>
+          </div>
+        </div>
+
+        <div class="dashboard-card" style="flex: 1;">
+          <div class="card-header">
+            <h3>Active Emergencies</h3>
+            <div class="card-icon">
+              <i class="fas fa-list-alt"></i>
+            </div>
+          </div>
+          <div class="card-body">
+            <ul class="emergency-list"></ul>
+          </div>
+          <div class="card-footer">
+            <a href="#">View All Emergencies <i class="fas fa-arrow-right"></i></a>
+            <span class="timestamp">Updated just now</span>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <footer>
+    <p>© 2025 Respondr Emergency Response System. All rights reserved.</p>
+  </footer>
+
+  <div class="notifications-panel" id="notifications-panel">
+    <div class="card-header">
+      <h3>Recent Notifications</h3>
+    </div>
+    <div class="card-body notifications-list" id="admin-notifications-list"></div>
+  </div>
+
+  <script>
+    // Mobile menu toggle functionality
+    document.getElementById('menuToggle').addEventListener('click', function() {
+      document.querySelector('.sidebar').classList.toggle('open');
+    });
+
+    // Toggle notifications panel
+    document.getElementById('notifications-toggle').addEventListener('click', function(e) {
+      e.preventDefault();
+      const panel = document.getElementById('notifications-panel');
+      panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+    });
+
+    // Sidebar notifications tab
+    document.getElementById('notifications-tab').addEventListener('click', function(e) {
+      e.preventDefault();
+      const panel = document.getElementById('notifications-panel');
+      panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+    });
+
+    // Logout button functionality
+    document.getElementById('logout-btn').addEventListener('click', function(e) {
+      e.preventDefault();
+      window.location.href = 'index.html';
+    });
+  </script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93e2e3b4890db0d9',t:'MTc0Njk3OTIyOC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+</body>
+</html>

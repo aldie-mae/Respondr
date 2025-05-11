@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Respondr - Emergency Response</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script type="module" src="supabase.js"></script>
+  <script type="module" src="respond-details.js"></script>
+  <style>
+    /* Consistent styling with other pages */
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Arial', sans-serif; }
+    :root {
+      --primary: #e74c3c; --primary-dark: #c0392b; --secondary: #1b263b; --secondary-light: #2c3e50;
+      --accent: #3498db; --success: #2ecc71; --warning: #f39c12; --danger: #e74c3c;
+      --light: #ecf0f1; --dark: #2c3e50; --gray: #95a5a6;
+    }
+    body { background-color: #f5f5f5; color: var(--dark); min-height: 100vh; display: flex; flex-direction: column; }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f1f1; }
+    ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--primary-dark); }
+
+    /* Header */
+    header {
+      background: var(--primary); padding: 0.8rem 2rem; display: flex; align-items: center;
+      justify-content: space-between; position: fixed; width: 100%; top: 0; left: 0; z-index: 1000;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    .logo-container { display: flex; align-items: center; }
+    .logo { width: 40px; height: auto; margin-right: 10px; }
+    header h1 { color: white; font-size: 24px; font-weight: 700; letter-spacing: 0.5px; }
+    nav ul { display: flex; list-style: none; margin: 0; padding: 0; }
+    nav ul li { margin: 0; position: relative; }
+    nav ul li a {
+      text-decoration: none; color: white; font-size: 16px; font-weight: 500; padding: 1rem 1.25rem;
+      display: flex; align-items: center; transition: 0.3s; border-radius: 4px;
+    }
+    nav ul li a:hover, nav ul li a.active { background: rgba(0, 0, 0, 0.1); }
+    .menu-toggle { display: none; background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; margin-right: 1rem; }
+
+    /* Main Content */
+    .container { display: flex; flex: 1; margin-top: 70px; }
+    .main-content { flex: 1; padding: 1.5rem; transition: all 0.3s; }
+    
+    /* Emergency Details Card */
+    .emergency-card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+      margin-bottom: 2rem;
+      overflow: hidden;
+    }
+    .emergency-header {
+      background: var(--secondary);
+      color: white;
+      padding: 1.5rem;
+      position: relative;
+    }
+    .emergency-type {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+    }
+    .emergency-type i {
+      margin-right: 1rem;
+      font-size: 1.5rem;
+    }
+    .emergency-location {
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      opacity: 0.9;
+    }
+    .emergency-location i {
+      margin-right: 0.5rem;
+    }
+    .emergency-status {
+      position: absolute;
+      top: 1.5rem;
+      right: 1.5rem;
+      background: var(--success);
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    .emergency-body {
+      padding: 1.5rem;
+    }
+    .emergency-description {
+      background: rgba(236, 240, 241, 0.5);
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+      border-left: 4px solid var(--accent);
+    }
+    .emergency-description h3 {
+      font-size: 1.2rem;
+      margin-bottom: 0.75rem;
+      color: var(--secondary);
+    }
+    .emergency-description p {
+      line-height: 1.6;
+      color: var(--dark);
+    }
+    
+    /* AI Response Card */
+    .ai-card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+      margin-bottom: 2rem;
+    }
+    .ai-header {
+      background: var(--accent);
+      color: white;
+      padding: 1.2rem 1.5rem;
+      display: flex;
+      align-items: center;
+    }
+    .ai-header i {
+      font-size: 1.5rem;
+      margin-right: 1rem;
+    }
+    .ai-header h2 {
+      font-size: 1.4rem;
+      font-weight: 600;
+    }
+    .ai-body {
+      padding: 1.5rem;
+      position: relative;
+      min-height: 100px;
+    }
+    .ai-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 150px;
+    }
+    .ai-loading i {
+      font-size: 2rem;
+      color: var(--accent);
+      animation: spin 1.5s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    #ai-response {
+      line-height: 1.6;
+      white-space: pre-line;
+    }
+    
+    /* Actions Section */
+    .actions-card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+    }
+    .actions-header {
+      background: var(--secondary);
+      color: white;
+      padding: 1.2rem 1.5rem;
+    }
+    .actions-header h2 {
+      font-size: 1.4rem;
+      font-weight: 600;
+    }
+    .actions-body {
+      padding: 1.5rem;
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .action-button {
+      flex: 1 1 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--light);
+      color: var(--dark);
+      padding: 1rem;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.3s;
+      border: none;
+      cursor: pointer;
+    }
+    .action-button i {
+      margin-right: 0.75rem;
+      font-size: 1.2rem;
+    }
+    .action-button.primary {
+      background: var(--primary);
+      color: white;
+    }
+    .action-button.primary:hover {
+      background: var(--primary-dark);
+    }
+    .action-button.secondary {
+      background: var(--accent);
+      color: white;
+    }
+    .action-button.secondary:hover {
+      background: #2980b9;
+    }
+    
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      background: var(--light);
+      color: var(--dark);
+      margin-top: auto;
+      border-top: 1px solid rgba(0, 0, 0, 0.05);
+    }
+    
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      header { padding: 0.5rem 1rem; }
+      .logo { width: 30px; }
+      header h1 { font-size: 18px; }
+      nav ul li a { padding: 0.5rem 0.75rem; font-size: 14px; }
+      .emergency-status { position: static; display: inline-block; margin-top: 1rem; }
+      .menu-toggle { display: block; }
+    }
+    
+    /* Animation */
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .fade-in { animation: fadeIn 0.5s ease-in-out; }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .slide-up { animation: slideUp 0.5s ease-in-out; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo-container">
+      <img src="assets/logohdr.png" alt="Respondr Logo" class="logo" />
+      <h1>Respondr</h1>
+    </div>
+    <button class="menu-toggle" id="menuToggle">
+      <i class="fas fa-bars"></i>
+    </button>
+    <nav>
+      <ul>
+        <li><a href="responder.html">Dashboard</a></li>
+        <li><a href="#" class="active">Emergency Response</a></li>
+        <li><a href="#">Profile</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <div class="container">
+    <main class="main-content">
+      <section class="emergency-card fade-in">
+        <div class="emergency-header">
+          <div class="emergency-type">
+            <i class="fas fa-exclamation-triangle" id="emergency-icon"></i>
+            <span id="emergency-type">Loading...</span>
+          </div>
+          <div class="emergency-location">
+            <i class="fas fa-map-marker-alt"></i>
+            <span id="emergency-location">Loading location...</span>
+          </div>
+          <div class="emergency-status">Active Response</div>
+        </div>
+        <div class="emergency-body">
+          <div class="emergency-description">
+            <h3>Emergency Details</h3>
+            <p id="emergency-description">Loading emergency details...</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="ai-card slide-up">
+        <div class="ai-header">
+          <i class="fas fa-robot"></i>
+          <h2>AI Response Guide</h2>
+        </div>
+        <div class="ai-body">
+          <div class="ai-loading" id="ai-loading">
+            <i class="fas fa-spinner"></i>
+          </div>
+          <div id="ai-response" style="display:none;"></div>
+        </div>
+      </section>
+
+      <section class="actions-card slide-up">
+        <div class="actions-header">
+          <h2>Response Actions</h2>
+        </div>
+        <div class="actions-body">
+          <button class="action-button primary">
+            <i class="fas fa-check-circle"></i>
+            Mark As Handled
+          </button>
+          <button class="action-button secondary">
+            <i class="fas fa-phone"></i>
+            Call Dispatch
+          </button>
+          <button class="action-button" id="back-button">
+            <i class="fas fa-arrow-left"></i>
+            Back to Dashboard
+          </button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer>
+    <p>© 2025 Respondr Emergency Response System. All rights reserved.</p>
+  </footer>
+
+  <script>
+    // Mobile menu toggle
+    document.getElementById('menuToggle').addEventListener('click', function() {
+      document.querySelector('.sidebar').classList.toggle('open');
+    });
+    
+    // Back button
+    document.getElementById('back-button').addEventListener('click', function() {
+      window.location.href = 'responder.html';
+    });
+  </script>
+</body>
+</html>

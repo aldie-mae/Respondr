@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emergencies</title>
+    <link rel="stylesheet" href="dashboard.css"> <!-- Global styles for header/nav -->
+    <link rel="stylesheet" href="emergencies.css"> <!-- Styles for emergencies layout -->
+</head>
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="assets/logohdr.png" alt="Respondr Logo" class="logo">
+            <h1>Respondr</h1>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="dashboard.html" class="nav-link">Home</a></li>
+                <li><a href="emergencies.html" class="nav-link">Emergencies</a></li>
+                <li><a href="report.html" class="nav-link">Report</a></li>
+                <li><a href="profile.html" class="nav-link">Profile</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="emergencies-section">
+            <h1>Emergency Reports</h1>
+            <div id="emergency-list">
+                <!-- Emergency items will be populated by JavaScript -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Scripts -->
+    <script type="module" src="supabase.js"></script>
+    <script type="module" src="emergencies.js"></script>
+</body>
+</html>

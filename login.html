@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login | Respondr</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Logo and Respondr title -->
+  <div class="header-bar">
+    <img src="assets/logohdr.png" alt="Respondr Logo" />
+    <h1>Respondr</h1>
+  </div>
+
+  <!-- Login Form -->
+  <div class="container">
+    <h2>Login</h2>
+    <form id="loginForm">
+      <input type="text" id="loginUsername" placeholder="Username" required />
+      <input type="password" id="loginPassword" placeholder="Password" required />
+      <button type="submit">Login</button>
+    </form>
+  </div>
+
+  <script src="supabase.js" type="module"></script>
+  <script src="auth.js" type="module"></script>
+
+</body>
+</html>
